@@ -1,57 +1,64 @@
 const express = require('express');
 const app = express();
-const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
-const config = require('../config/config');
+const db = require('../db/db');
 
-
-const connection = new Connection(config.configTedious);
 
 
 app.get('/sp1076', (req, res) => {
+
+    res.set('Content-Type', 'application/json');
+
     let ini = new Date(2019, 0, 1);
     let ter = new Date(2019, 0, 05);
 
-    connection.on('connect', function(err) {
-        if (err) {
-          console.log(err);
-        } else {
-          console.log('Connected');
-        }
-    });
-    
-/*     connection.on('connect', function(err) {
+    let request = new Request('SP_1076_GNTM', function(err) {
         if (err) {
             console.log(err);
         }
+    });
 
-        let request = new Request('SP_1076_GNTM', function(err) {
+    request.addOutputParameter('NombreTabla', TYPES.NVarChar);
+    request.addParameter('fecini', TYPES.SmallDateTime, ini);
+    request.addParameter('fecter', TYPES.SmallDateTime, ter);
+    request.addParameter('codven', TYPES.SmallInt, '0');
+    request.addParameter('codloc', TYPES.SmallInt, '0');
+
+
+    request.on('returnValue', function(paramName, value, metadata) {
+
+        let tablaOutputSp = value.split('.')[1].slice(1, -1);
+
+        let requestTabla = new Request('SELECT * FROM ' + tablaOutputSp, function(err, rowCount) {
             if (err) {
-              console.log(err);
+                console.log(err);
             }
         });
-      
-        request.addOutputParameter('NombreTabla', TYPES.NVarChar(50));
-        request.addParameter('fecini', TYPES.SmallDateTime, ini);
-        request.addParameter('fecter', TYPES.SmallDateTime, ter);
-        request.addParameter('codven', TYPES.SmallInt, '0');
-        request.addParameter('codloc', TYPES.SmallInt, '0');
-      
-        request.on('returnValue', function(paramName, value, metadata) {
-            console.log('hola', value);
+
+        let result = "";
+        requestTabla.on('done', function(rowCount, more, rows) {
+            /* columns.forEach(function(column) {
+                if (column.value === null) {
+                    console.log('NULL');
+                } else {
+                    result += column.value + " ";
+                }
+            }); */
             res.json({
                 ok: true,
-                paramName,
-                value,
-                metadata
+                tablaOutputSp,
+                rowCount,
+                more,
+                rows
             });
-            
+            result = "";
         });
-      
-        connection.callProcedure(request);
-    }); */
 
+        db.executeSQL(requestTabla);
+    });
+
+    db.executeSQL(request);
 });
 
 
@@ -72,8 +79,6 @@ if (recordsets.rowsAffected.length === 0) {
         mensaje: 'No hay informacion para la consulta'
     });
 }
-
-let tablaOutputSp = recordsets.output.NombreTabla.split('.')[1].slice(1, -1); */
 
 
 /* prueba */
